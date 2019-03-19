@@ -171,7 +171,9 @@ class ConformanceCriteria {
           const timepointId = measurement.timepointId;
           const timepoint =
             timepointId &&
-            this.timepointApi.timepoints.findOne({ timepointId });
+            this.timepointApi.timepoints.find(
+              a => a.timepointId === timepointId
+            );
 
           if (
             !timepoint ||

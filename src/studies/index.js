@@ -19,7 +19,8 @@ const studies = {
   deleteStudyMetadataPromise,
   retrieveStudiesMetadata,
   getStudyBoxData,
-  searchStudies
+  searchStudies,
+  loadStudy
 };
 
 export default studies;

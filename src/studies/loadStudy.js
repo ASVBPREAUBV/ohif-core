@@ -1,6 +1,8 @@
 import { retrieveStudyMetadata } from './retrieveStudyMetadata';
 import { StudyMetadata } from '../classes/metadata/StudyMetadata';
+import { sortingManager } from '../utils/sortingManager.js';
 import { updateMetaDataManager } from '../utils/updateMetaDataManager';
+import studyMetadataManager from '../utils/studyMetadataManager';
 
 // TODO: Use callbacks or redux?
 const loadingDict = {};
@@ -11,60 +13,56 @@ const loadingDict = {};
  * @param {String} studyInstanceUid The UID of the Study to be loaded
  * @returns {Promise} that will be resolved with the study metadata or rejected with an error
  */
-export default function loadStudy(server, studyInstanceUid) {
-  return new Promise((resolve, reject) => {
-    let currentLoadingState = loadingDict[studyInstanceUid] || '';
+async function loadStudy(server, studyInstanceUid) {
+  let currentLoadingState = loadingDict[studyInstanceUid];
 
-    // Set the loading state as the study is not yet loaded
-    if (currentLoadingState !== 'loading') {
-      loadingDict[studyInstanceUid] = 'loading';
-    }
+  // Set the loading state as the study is not yet loaded
+  if (currentLoadingState !== 'loading') {
+    loadingDict[studyInstanceUid] = 'loading';
+  }
 
-    /*const studyLoaded = OHIF.viewer.Studies.findBy({
-      studyInstanceUid: studyInstanceUid
-    });
-    if (studyLoaded) {
-      loadingDict[studyInstanceUid] = 'loaded';
-      resolve(studyLoaded);
-      return;
-    }*/
+  /*
+  if (loadingDict[studyInstanceUid] === 'loaded') {
+    ;
+    resolve(studyLoaded);
+    return;
+  }*/
 
-    return retrieveStudyMetadata(server, studyInstanceUid)
-      .then(study => {
-        // Once the data was retrieved, the series are sorted by series and instance number
-        OHIF.viewerbase.sortStudy(study);
+  const study = await retrieveStudyMetadata(server, studyInstanceUid);
 
-        // Updates WADO-RS metaDataManager
-        updateMetaDataManager(study);
+  try {
+    // Once the data was retrieved, the series are sorted by series and instance number
+    OHIF.viewerbase.sortStudy(study);
 
-        // Transform the study in a StudyMetadata object
-        const studyMetadata = new StudyMetadata(study);
+    // Updates WADO-RS metaDataManager
+    updateMetaDataManager(study);
 
-        // Add the display sets to the study
-        study.displaySets = OHIF.viewerbase.sortingManager.getDisplaySets(
-          studyMetadata
-        );
-        study.displaySets.forEach(displaySet => {
-          OHIF.viewerbase.stackManager.makeAndAddStack(study, displaySet);
-          studyMetadata.addDisplaySet(displaySet);
-        });
+    // Transform the study into a StudyMetadata object
+    const studyMetadata = new StudyMetadata(study);
 
-        // Persist study data into OHIF.viewer
-        OHIF.viewer.Studies.insert(study);
-        OHIF.viewer.StudyMetadataList.insert(study);
+    // Add the display sets to the study
+    study.displaySets = sortingManager.getDisplaySets(studyMetadata);
 
-        // Add the study to the loading listener to allow loading progress handling
-        const studyLoadingListener = OHIF.viewerbase.StudyLoadingListener.getInstance();
-        studyLoadingListener.addStudy(study);
+    studyMetadata.setDisplaySets(study.displaySets);
 
-        // Add the studyInstanceUid to the loaded state dictionary
-        loadingDict[studyInstanceUid] = 'loaded';
+    // Persist study data into OHIF.viewer
+    //OHIF.viewer.Studies.insert(study);
+    //OHIF.viewer.StudyMetadataList.insert(study);
 
-        resolve(study);
-      })
-      .catch((...args) => {
-        loadingDict[studyInstanceUid] = 'failed';
-        reject(args);
-      });
-  });
+    // Add the study to the loading listener to allow loading progress handling
+    //const studyLoadingListener = OHIF.viewerbase.StudyLoadingListener.getInstance();
+    //studyLoadingListener.addStudy(study);
+
+    // Add the studyInstanceUid to the loaded state dictionary
+    loadingDict[studyInstanceUid] = 'loaded';
+
+    studyMetadataManager.add(studyMetadata);
+
+    return study;
+  } catch (error) {
+    loadingDict[studyInstanceUid] = 'failed';
+    reject(error);
+  }
 }
+
+export default loadStudy;
